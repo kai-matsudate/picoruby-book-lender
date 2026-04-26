@@ -23,6 +23,13 @@ class PN532
     {ic: data[0], ver: data[1], rev: data[2], support: data[3]}
   end
 
+  # MIFARE Type A UID を hex 文字列で返す。検出なし or タイムアウトは nil。
+  def poll_typeA(timeout_ms: DEFAULT_TIMEOUT_MS)
+    poll_passive_target(brty: 0x00, init_data: [], timeout_ms: timeout_ms) do |data|
+      extract_typeA_uid(data)
+    end
+  end
+
   # Sleep を host テストで上書きできるよう切り出す。実機では Kernel.sleep を使う。
   def sleep_ms(ms)
     sleep(ms / 1000.0)
@@ -66,5 +73,33 @@ class PN532
       sleep_ms(POLL_INTERVAL_MS)
       elapsed += POLL_INTERVAL_MS
     end
+  end
+
+  # 共通: InListPassiveTarget を投げ、検出失敗/タイムアウトは nil、成功は yield 経由で抽出
+  def poll_passive_target(brty:, init_data:, timeout_ms:)
+    @i2c.write(@addr, Frame.build(CMD_INLIST_PASSIVE_TARGET, [0x01, brty, *init_data]))
+    begin
+      wait_for_ack(timeout_ms)
+      cmd, data = read_response(timeout_ms)
+    rescue TimeoutError
+      return nil
+    end
+    raise ProtocolError, "unexpected response cmd 0x#{cmd.to_s(16)}" unless cmd == CMD_INLIST_PASSIVE_TARGET + 1
+    return nil if data.first == 0  # NbTg = 0 → カード未検出
+    yield data
+  end
+
+  # InListPassiveTarget Type A 応答 data の構造:
+  #   NbTg(1) Tg(1) SENS_RES(2) SEL_RES(1) NFCIDLen(1) NFCID(NFCIDLen) [ATSLen ATS]
+  # data[0]=NbTg, data[1]=Tg, data[2..3]=SENS_RES, data[4]=SEL_RES, data[5]=NFCIDLen
+  def extract_typeA_uid(data)
+    nfcid_len = data[5]
+    raise ProtocolError, "invalid NFCID length: #{nfcid_len}" if nfcid_len.nil? || nfcid_len < 4 || nfcid_len > 10
+    uid_bytes = data[6, nfcid_len]
+    bytes_to_hex(uid_bytes)
+  end
+
+  def bytes_to_hex(bytes)
+    bytes.map { |b| format("%02X", b) }.join
   end
 end
