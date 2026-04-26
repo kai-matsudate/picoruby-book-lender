@@ -1,0 +1,28 @@
+name: mrbgem-pn532 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mrbgems/mrbgem-pn532/**"
+      - ".github/workflows/mrbgem-pn532-ci.yml"
+  pull_request:
+    paths:
+      - "mrbgems/mrbgem-pn532/**"
+      - ".github/workflows/mrbgem-pn532-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mrbgems/mrbgem-pn532
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: mrbgems/mrbgem-pn532
+      - name: Run minitest
+        run: bundle exec rake test
