@@ -118,3 +118,58 @@ class PN532PollTypeATest < Minitest::Test
     assert_raises(PN532::ProtocolError) { @reader.poll_typeA(timeout_ms: 100) }
   end
 end
+
+class PN532PollFelicaTest < Minitest::Test
+  def setup
+    @i2c = MockI2C.new
+    @reader = PN532.new(i2c: @i2c, addr: 0x24)
+    @reader.define_singleton_method(:sleep_ms) { |_ms| nil }
+  end
+
+  # FeliCa 検出 (System Code 無し版)
+  # data = NbTg=01 Tg=01 ResLen=12 ResCode=01 IDm(8)=01 23 45 67 89 AB CD EF PMm(8)=00..00
+  # data 全体 20 byte: 01 01 12 01 01 23 45 67 89 AB CD EF 00 00 00 00 00 00 00 00
+  # payload = D5 4B + data = 22 byte
+  # LEN = 22 = 0x16, LCS = 0x100-0x16 = 0xEA
+  # sum = 0x4F5 → DCS = 0x100 - 0xF5 = 0x0B
+  def test_returns_idm_hex_string_when_felica_detected
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])  # ACK
+    @i2c.queue_response([0x01,
+                          0x00, 0x00, 0xFF, 0x16, 0xEA,
+                          0xD5, 0x4B,
+                          0x01, 0x01, 0x12, 0x01,
+                          0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                          0x0B, 0x00])
+
+    idm = @reader.poll_felica(timeout_ms: 100)
+
+    assert_equal "0123456789ABCDEF", idm
+  end
+
+  # NbTg=0 → nil
+  def test_returns_nil_when_no_felica_detected
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x03, 0xFD, 0xD5, 0x4B, 0x00, 0xE0, 0x00])
+
+    assert_nil @reader.poll_felica(timeout_ms: 100)
+  end
+
+  def test_sends_inlist_passive_target_felica_command
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x03, 0xFD, 0xD5, 0x4B, 0x00, 0xE0, 0x00])
+
+    @reader.poll_felica(timeout_ms: 100)
+
+    _, bytes = @i2c.write_log.first
+    # cmd=0x4A, data=[0x01, 0x01, 0x00, 0xFF, 0xFF, 0x01, 0x00]
+    assert_equal [0x00, 0x00, 0xFF, 0x09, 0xF7, 0xD4, 0x4A,
+                   0x01, 0x01, 0x00, 0xFF, 0xFF, 0x01, 0x00,
+                   0xE1, 0x00], bytes
+  end
+
+  def test_returns_nil_on_timeout
+    20.times { @i2c.queue_response([0x00] + [0x00] * 32) }
+    assert_nil @reader.poll_felica(timeout_ms: 5)
+  end
+end
