@@ -1,0 +1,39 @@
+# --- Ruby / Sinatra ---
+*.gem
+*.rbc
+.bundle/
+vendor/bundle/
+.rspec_status
+
+# --- Local SQLite DB ---
+*.sqlite3
+*.sqlite3-journal
+*.db
+
+# --- マスタデータ (実データは個人情報を含む可能性あり) ---
+backend/config/users.yml
+backend/config/books.yml
+
+# --- 環境変数 ---
+.env
+.env.*
+!.env.example
+
+# --- PicoRuby / mruby build artifacts ---
+firmware/build/
+mrbgems/*/build/
+*.uf2
+*.elf
+
+# --- macOS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- logs ---
+*.log
+log/
+
+# --- Wokwi 一時ファイル ---
+.wokwi/
