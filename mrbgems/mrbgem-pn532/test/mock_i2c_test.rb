@@ -31,4 +31,9 @@ class MockI2CTest < Minitest::Test
   def test_read_raises_when_queue_empty
     assert_raises(RuntimeError) { @i2c.read(0x24, 1) }
   end
+
+  def test_read_returns_fewer_bytes_when_queue_shorter_than_requested
+    @i2c.queue_response([0x01, 0x02])
+    assert_equal [0x01, 0x02], @i2c.read(0x24, 5)
+  end
 end
