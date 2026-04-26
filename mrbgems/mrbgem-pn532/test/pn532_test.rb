@@ -106,4 +106,15 @@ class PN532PollTypeATest < Minitest::Test
     20.times { @i2c.queue_response([0x00] + [0x00] * 32) }
     assert_nil @reader.poll_typeA(timeout_ms: 5)
   end
+
+  # NFCIDLen=07 だが UID 領域が 4 byte しか無いトランケート応答 → ProtocolError
+  # payload = D5 4B 01 01 00 04 08 07 04 A1 B2 C3 (12 bytes)
+  # LEN=0x0C, LCS=0xF4, sum=0x34F, DCS=0xB1
+  def test_raises_on_truncated_nfcid_payload
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])  # ACK
+    @i2c.queue_response([0x01, 0x00, 0x00, 0xFF, 0x0C, 0xF4, 0xD5, 0x4B,
+                          0x01, 0x01, 0x00, 0x04, 0x08, 0x07, 0x04, 0xA1, 0xB2, 0xC3,
+                          0xB1, 0x00])
+    assert_raises(PN532::ProtocolError) { @reader.poll_typeA(timeout_ms: 100) }
+  end
 end

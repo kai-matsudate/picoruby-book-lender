@@ -96,6 +96,7 @@ class PN532
     nfcid_len = data[5]
     raise ProtocolError, "invalid NFCID length: #{nfcid_len}" if nfcid_len.nil? || nfcid_len < 4 || nfcid_len > 10
     uid_bytes = data[6, nfcid_len]
+    raise ProtocolError, "NFCID data truncated: expected #{nfcid_len}, got #{uid_bytes.size}" unless uid_bytes.size == nfcid_len
     bytes_to_hex(uid_bytes)
   end
 
