@@ -30,6 +30,7 @@ class PN532
       raise ProtocolError, "no start code (00 FF) in #{bytes.inspect}" unless start
 
       after_start = bytes[(start + 2)..]
+      raise ProtocolError, "frame truncated after start code: only #{after_start.size} byte(s) remain" if after_start.size < 2
       return :ack  if after_start[0, 2] == ACK_BODY
       return :nack if after_start[0, 2] == NACK_BODY
 
@@ -50,6 +51,9 @@ class PN532
       lcs = header[1]
       raise ChecksumError, "LCS mismatch: len=#{len.inspect} lcs=#{lcs.inspect}" \
         unless ((len + lcs) & 0xFF) == 0
+
+      raise ProtocolError, "frame truncated: declared len=#{len} but only #{header.size - 2} bytes remain" \
+        if header.size < 2 + len + 1
 
       payload = header[2, len]
       dcs = header[2 + len]

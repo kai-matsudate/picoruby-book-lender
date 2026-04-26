@@ -30,6 +30,13 @@ class FrameBuildTest < Minitest::Test
 end
 
 class FrameParseAckTest < Minitest::Test
+  def test_classify_raises_on_truncated_after_start
+    # 5 bytes total (passes size < 5 guard), start code at index 1,
+    # but only 1 byte remains after start code → truncated
+    bytes = [0x00, 0x00, 0x00, 0xFF, 0x06]
+    assert_raises(PN532::ProtocolError) { PN532::Frame.classify(bytes) }
+  end
+
   def test_recognizes_ack_frame
     bytes = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00]
     assert_equal :ack, PN532::Frame.classify(bytes)
@@ -77,6 +84,12 @@ class FrameParseResponseTest < Minitest::Test
     # TFI が 0xD4 (host→PN532) になっているおかしなフレーム
     # LEN=2, LCS=0xFE, sum(D4+03)=D7, DCS=29
     bytes = [0x00, 0x00, 0xFF, 0x02, 0xFE, 0xD4, 0x03, 0x29, 0x00]
+    assert_raises(PN532::ProtocolError) { PN532::Frame.parse_response(bytes) }
+  end
+
+  def test_parse_response_raises_on_truncated_payload
+    # LCS は整合 (LEN=0x06, LCS=0xFA, sum=0x100)、しかしペイロードが不足
+    bytes = [0x00, 0x00, 0xFF, 0x06, 0xFA, 0xD5, 0x03, 0x32]
     assert_raises(PN532::ProtocolError) { PN532::Frame.parse_response(bytes) }
   end
 end
