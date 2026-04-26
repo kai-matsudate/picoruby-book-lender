@@ -11,6 +11,8 @@ class PN532
   CMD_GET_FIRMWARE_VERSION  = 0x02
   CMD_INLIST_PASSIVE_TARGET = 0x4A
 
+  FELICA_POLLING_INIT_DATA = [0x00, 0xFF, 0xFF, 0x01, 0x00].freeze
+
   def initialize(i2c:, addr: DEFAULT_ADDR)
     @i2c = i2c
     @addr = addr
@@ -31,8 +33,6 @@ class PN532
   end
 
   # FeliCa IDm を hex 文字列で返す。検出なし or タイムアウトは nil。
-  FELICA_POLLING_INIT_DATA = [0x00, 0xFF, 0xFF, 0x01, 0x00].freeze
-
   def poll_felica(timeout_ms: DEFAULT_TIMEOUT_MS)
     poll_passive_target(brty: 0x01, init_data: FELICA_POLLING_INIT_DATA, timeout_ms: timeout_ms) do |data|
       extract_felica_idm(data)
@@ -114,9 +114,7 @@ class PN532
   # data[4..11] が IDm
   def extract_felica_idm(data)
     raise ProtocolError, "FeliCa response too short: #{data.inspect}" if data.size < 12
-    idm_bytes = data[4, 8]
-    raise ProtocolError, "FeliCa IDm truncated" unless idm_bytes.size == 8
-    bytes_to_hex(idm_bytes)
+    bytes_to_hex(data[4, 8])
   end
 
   def bytes_to_hex(bytes)
